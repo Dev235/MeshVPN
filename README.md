@@ -22,7 +22,11 @@ MeshVPN is a fully self-hosted, high-performance mesh VPN system built with Go a
 ### Option A: Docker Compose (Recommended)
 ```bash
 cp .env.example .env
-docker compose up -d
+docker-compose up -d
+
+# Run CLI commands directly inside the control container:
+docker exec -it meshvpn-control meshvpn network create minecraft
+docker exec -it meshvpn-control meshvpn invite create minecraft
 ```
 
 ### Option B: Native Execution (Without Docker)
