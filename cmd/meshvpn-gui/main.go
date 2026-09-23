@@ -1,8 +1,8 @@
 package main
 
 import (
-	_ "embed"
 	"bytes"
+	_ "embed"
 	"encoding/json"
 	"flag"
 	"fmt"

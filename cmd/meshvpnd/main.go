@@ -331,7 +331,44 @@ func handleIPCConn(conn net.Conn, state *DaemonState) {
 				}
 				resp.Message = fmt.Sprintf("Failed to create network: %s", errMsg)
 			} else {
-				resp.Message = fmt.Sprintf("Network '%s' created successfully.", req.NetworkName)
+				// Automatically join the newly created network immediately
+				joinReq := protocol.JoinNetworkRequest{
+					NetworkName:        req.NetworkName,
+					Password:           req.Password,
+					NodeID:             state.Identity.NodeID,
+					WireGuardPublicKey: state.Identity.WireGuardPublicKey,
+				}
+				joinBody, _ := json.Marshal(joinReq)
+				joinHttpResp, joinErr := http.Post(state.ControlURL+"/api/v1/networks/join", "application/json", bytes.NewBuffer(joinBody))
+				if joinErr == nil && joinHttpResp.StatusCode == http.StatusOK {
+					defer joinHttpResp.Body.Close()
+					var joinResp protocol.JoinNetworkResponse
+					if err := json.NewDecoder(joinHttpResp.Body).Decode(&joinResp); err == nil {
+						state.ActiveNetwork = joinResp.NetworkName
+						state.VirtualIP = joinResp.VirtualIP
+						state.Subnet = joinResp.Subnet
+						state.Peers = joinResp.Peers
+						state.ACLRules = joinResp.ACLRules
+						state.AclEngine.SetRules(joinResp.ACLRules)
+
+						resp.Message = fmt.Sprintf("Network '%s' created and joined. Assigned Virtual IP: %s", req.NetworkName, joinResp.VirtualIP)
+						resp.Data = map[string]interface{}{
+							"virtual_ip": joinResp.VirtualIP,
+							"network":    joinResp.NetworkName,
+						}
+						go performSync(context.Background(), state)
+					}
+				} else {
+					errMsg := "join error"
+					if joinErr != nil {
+						errMsg = joinErr.Error()
+					} else if joinHttpResp != nil {
+						b, _ := io.ReadAll(joinHttpResp.Body)
+						_ = joinHttpResp.Body.Close()
+						errMsg = fmt.Sprintf("status %d: %s", joinHttpResp.StatusCode, strings.TrimSpace(string(b)))
+					}
+					resp.Message = fmt.Sprintf("Network '%s' created, but auto-join failed: %s", req.NetworkName, errMsg)
+				}
 			}
 		}
 

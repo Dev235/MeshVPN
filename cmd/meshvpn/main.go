@@ -131,6 +131,24 @@ func isDaemonRunning() bool {
 	return true
 }
 
+func ensureDaemonRunning() {
+	if isDaemonRunning() {
+		return
+	}
+	fmt.Println("[meshvpn] Starting background service (meshvpnd)...")
+	if err := startDaemonProcess(); err != nil {
+		fmt.Fprintf(os.Stderr, "Notice: could not auto-spawn daemon: %v\n", err)
+		return
+	}
+	for i := 0; i < 8; i++ {
+		time.Sleep(300 * time.Millisecond)
+		if isDaemonRunning() {
+			fmt.Println("[meshvpn] Daemon service online.")
+			return
+		}
+	}
+}
+
 func findDaemonBinary() (string, error) {
 	// 1. Check directory of this executable
 	exePath, err := os.Executable()
@@ -162,6 +180,16 @@ func findDaemonBinary() (string, error) {
 	return "", fmt.Errorf("could not find meshvpnd executable in PATH, bin/, or current directory")
 }
 
+func startDaemonProcess() error {
+	binPath, err := findDaemonBinary()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(binPath)
+	setDetachedProcess(cmd)
+	return cmd.Start()
+}
+
 func handleDaemonCmd(args []string) {
 	if len(args) < 1 {
 		fmt.Println("Usage: meshvpn daemon <start|stop|status>")
@@ -176,15 +204,7 @@ func handleDaemonCmd(args []string) {
 			return
 		}
 
-		binPath, err := findDaemonBinary()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-
-		cmd := exec.Command(binPath)
-		setDetachedProcess(cmd)
-		if err := cmd.Start(); err != nil {
+		if err := startDaemonProcess(); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to start daemon: %v\n", err)
 			os.Exit(1)
 		}
@@ -330,6 +350,8 @@ func handleJoin(args []string) {
 		os.Exit(1)
 	}
 
+	ensureDaemonRunning()
+
 	target := args[0]
 	var password string
 
@@ -389,6 +411,7 @@ func isHexString(s string) bool {
 }
 
 func handleLeave(args []string) {
+	ensureDaemonRunning()
 	req := &ipc.Request{Command: "leave"}
 	resp, err := sendIPC(req)
 	if err != nil || !resp.Success {
@@ -408,14 +431,21 @@ func handleNetworkCmd(args []string) {
 	switch sub {
 	case "create":
 		if len(args) < 2 {
-			fmt.Println("Usage: meshvpn network create <name> [--password <pass>] [--subnet <cidr>]")
+			fmt.Println("Usage: meshvpn network create <name> [password] [--password <pass>] [--subnet <cidr>]")
 			os.Exit(1)
 		}
+
+		ensureDaemonRunning()
 
 		var netName, password, subnet string
 		subnet = "10.100.0.0/16"
 
-		for i := 1; i < len(args); i++ {
+		netName = args[1]
+		if len(args) >= 3 && !strings.HasPrefix(args[2], "-") {
+			password = args[2]
+		}
+
+		for i := 2; i < len(args); i++ {
 			if args[i] == "--password" || args[i] == "-p" {
 				if i+1 < len(args) {
 					password = args[i+1]
@@ -426,8 +456,6 @@ func handleNetworkCmd(args []string) {
 					subnet = args[i+1]
 					i++
 				}
-			} else if netName == "" {
-				netName = args[i]
 			}
 		}
 

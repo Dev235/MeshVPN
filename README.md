@@ -18,90 +18,85 @@ MeshVPN is a fully self-hosted, high-performance mesh VPN system built with Go a
 
 ---
 
-## Quickstart: Self-Hosting Control & Relay Server
+## Quickstart: Self-Hosting Server (Native or Docker)
 
-### Option A: Docker Compose (Recommended)
+### Option A: Native All-in-One Server (Without Docker - Easiest)
+
+MeshVPN can run the **entire backend infrastructure in a single binary** without Docker. It automatically bundles the HTTP REST Control Plane (`:8080`), UDP STUN Reflector (`:3478`), and Zero-Knowledge Relay Forwarder (`:41641`):
+
+```bash
+# Windows: Double-click start-server.bat or run:
+.\bin\meshvpn-server.exe
+
+# Linux / macOS:
+./bin/meshvpn-server
+```
+
+### Option B: Docker Compose
+
 ```bash
 cp .env.example .env
 docker-compose up -d
 
 # Create a password-protected network:
-docker exec -it meshvpn-control meshvpn network create minecraft --password mysecretpass
+docker exec -it meshvpn-control meshvpn network create minecraft mysecretpass
 ```
-
-### Option B: Native Execution (Without Docker)
-
-1. **Build Binaries**:
-   ```bash
-   go build -o bin/meshvpn-server ./cmd/meshvpn-server
-   go build -o bin/meshvpn-relay ./cmd/meshvpn-relay
-   go build -o bin/meshvpnd ./cmd/meshvpnd
-   go build -o bin/meshvpn ./cmd/meshvpn
-   go build -o bin/meshvpn-gui ./cmd/meshvpn-gui
-   ```
-
-2. **Start Control Server & Embedded STUN Reflector**:
-   ```bash
-   ./bin/meshvpn-server -addr :8080 -stun-addr :3478 -db meshvpn-control.json
-   ```
-
-3. **Start Zero-Knowledge Relay Server**:
-   ```bash
-   ./bin/meshvpn-relay -addr :41641
-   ```
 
 ---
 
-## Headless Linux Minecraft Server Setup
+## ⚡ Client Setup: CLI & Headless Environments
 
-### 1. Build and Install Daemon
+### 🚀 One-Liner Automated Install & Run (Linux / Homelab / VPS)
+
+Install the daemon, configure the systemd background service, and connect to a network **in a single command**:
 
 ```bash
-sudo cp meshvpnd /usr/local/bin/
-sudo cp meshvpn /usr/local/bin/
-sudo cp deploy/meshvpn.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now meshvpn
+# Install and join in one line:
+curl -fsSL https://raw.githubusercontent.com/Dev235/MeshVPN/master/install.sh | bash -s -- join minecraft mysecretpass
+
+# Or install first, then run commands at your leisure:
+curl -fsSL https://raw.githubusercontent.com/Dev235/MeshVPN/master/install.sh | bash
 ```
 
-### 2. Join Network (Headless CLI)
+### ZeroTier-Style Clean CLI Usage
+
+No manual background daemon management required — `meshvpn` automatically launches the background service if it is offline:
 
 ```bash
-# Join network using Network Name + Password:
-meshvpn join minecraft --password mysecretpass
+# Create a network (you are automatically placed inside it immediately!):
+meshvpn network create minecraft mysecretpass
 
-# Or join using a legacy invite token:
-meshvpn join <invite-token>
-```
+# Join an existing network:
+meshvpn join minecraft mysecretpass
 
-Verify Virtual IPv4:
-```bash
+# Check your assigned Virtual IP and status:
 meshvpn status
-```
-Output:
-```text
-Virtual IPv4: 10.100.0.10
-Active Network: minecraft
+
+# List networks:
+meshvpn listnetworks
+
+# Leave network:
+meshvpn leave
 ```
 
 ---
 
-## Windows Desktop GUI Setup
+## 🖥️ Windows Desktop GUI Setup (Non-Technical Users)
 
-For a seamless Windows desktop experience with System Tray ("hidden icons") support:
+Designed from the ground up for non-technical users who want a seamless, zero-configuration desktop experience:
 
-1. **Start the GUI Application**:
+1. **One-Liner Windows Install**:
    ```powershell
-   # Run the standalone desktop GUI:
-   .\bin\meshvpn-gui.exe
+   irm https://raw.githubusercontent.com/Dev235/MeshVPN/master/install.ps1 | iex
    ```
-2. **Create or Join Networks**:
-   - Click **Network** -> **Create new network...**: Enter **Network Name** and **Password**.
-   - Click **Network** -> **Join an existing network...**: Enter credentials to connect.
-   - **One-Click Copy**: Click the **Copy** button next to your assigned Virtual IPv4 (e.g. `10.100.0.11`).
-   - **Live Peer Tree**: View all online friends/servers, latency, connection mode (Direct P2P vs Relayed), and ping peers.
-   - **Power Switch**: Turn VPN connection On/Off instantly with the power button.
-   - **System Tray**: Minimizes cleanly to the Windows taskbar hidden icons area with live status and quick action menu.
+   Or double-click `start-gui.bat` / run `.\bin\meshvpn-gui.exe`.
+
+2. **Zero Configuration**:
+   - **Silent Background Engine**: The background daemon starts automatically in the background — no terminal windows to manage.
+   - **Auto-Join on Create**: Click **Network** -> **Create new network...**, enter a name and password, and you are **instantly placed inside it** with your Virtual IPv4 assigned!
+   - **One-Click Connect**: Friends click **Network** -> **Join an existing network...**, type credentials, and connect.
+   - **System Tray ("Hidden Icons")**: Minimizes cleanly to the Windows taskbar notification area so your mesh connection stays alive in the background.
+   - **Power Switch**: Toggle your VPN connection On/Off with one click.
 
 ### 3. Bind Minecraft Server
 
