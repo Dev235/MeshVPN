@@ -16,6 +16,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /bin/meshvpn ./cmd/mes
 FROM alpine:3.18 AS server
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /bin/meshvpn-server /usr/local/bin/meshvpn-server
+COPY --from=builder /bin/meshvpn /usr/local/bin/meshvpn
 EXPOSE 8080 3478/udp
 ENTRYPOINT ["/usr/local/bin/meshvpn-server"]
 
