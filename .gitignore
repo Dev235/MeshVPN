@@ -1,15 +1,15 @@
 # MeshVPN gitignore
 
-# Binaries
+# Binary output folder & root output binaries
 bin/
+/meshvpn-server
+/meshvpn-relay
+/meshvpnd
+/meshvpn
 *.exe
 *.exe.stackdump
 *.test
 *.out
-meshvpn-server
-meshvpn-relay
-meshvpnd
-meshvpn
 
 # Storage & Identity state
 meshvpn-control.json
