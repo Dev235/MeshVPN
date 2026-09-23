@@ -1,0 +1,32 @@
+services:
+  meshvpn-control:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: server
+    container_name: meshvpn-control
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "3478:3478/udp" # STUN UDP Reflector
+    volumes:
+      - meshvpn-control-data:/data
+    environment:
+      - ADDR=:8080
+      - STUN_ADDR=:3478
+      - DB_PATH=/data/meshvpn-control.json
+
+  meshvpn-relay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: relay
+    container_name: meshvpn-relay
+    restart: unless-stopped
+    ports:
+      - "41641:41641/udp" # Zero-Knowledge Relay UDP
+    environment:
+      - ADDR=:41641
+
+volumes:
+  meshvpn-control-data:

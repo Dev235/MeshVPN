@@ -1,0 +1,26 @@
+# MeshVPN gitignore
+
+# Binaries
+bin/
+*.exe
+*.exe.stackdump
+*.test
+*.out
+meshvpn-server
+meshvpn-relay
+meshvpnd
+meshvpn
+
+# Storage & Identity state
+meshvpn-control.json
+identity.conf
+/etc/meshvpn/
+*.db
+*.sqlite
+
+# Environment & IDE
+.env
+.idea/
+.vscode/
+*.swp
+*~
