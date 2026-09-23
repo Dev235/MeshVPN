@@ -64,14 +64,17 @@ type DeviceRegisterResponse struct {
 type CreateNetworkRequest struct {
 	NetworkName string `json:"network_name"`
 	Subnet      string `json:"subnet,omitempty"` // Default: 10.100.0.0/16
+	Password    string `json:"password,omitempty"`
 }
 
-// JoinNetworkRequest defines request payload to join a network using an invite token.
+// JoinNetworkRequest defines request payload to join a network using an invite token or name+password.
 type JoinNetworkRequest struct {
-	InviteToken        string `json:"invite_token"`
+	NetworkName        string `json:"network_name,omitempty"`
+	Password           string `json:"password,omitempty"`
+	InviteToken        string `json:"invite_token,omitempty"`
 	NodeID             string `json:"node_id"`
 	WireGuardPublicKey string `json:"wireguard_public_key"`
-	Signature          string `json:"signature"` // Ed25519 signature of (NodeID + InviteToken)
+	Signature          string `json:"signature,omitempty"` // Ed25519 signature
 }
 
 // JoinNetworkResponse contains network membership & IP assignment.

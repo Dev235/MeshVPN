@@ -11,11 +11,13 @@ import (
 	"github.com/meshvpn/meshvpn/pkg/protocol"
 )
 
-// Request defines IPC command payload sent from CLI to meshvpnd.
+// Request defines IPC command payload sent from CLI or GUI to meshvpnd.
 type Request struct {
-	Command     string                 `json:"command"` // 'status', 'diagnose', 'join', 'leave', etc.
+	Command     string                 `json:"command"` // 'status', 'diagnose', 'join', 'leave', 'network_create', etc.
 	InviteToken string                 `json:"invite_token,omitempty"`
 	NetworkName string                 `json:"network_name,omitempty"`
+	Password    string                 `json:"password,omitempty"`
+	Subnet      string                 `json:"subnet,omitempty"`
 	ControlURL  string                 `json:"control_url,omitempty"`
 	Args        map[string]interface{} `json:"args,omitempty"`
 }

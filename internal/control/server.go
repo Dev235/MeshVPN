@@ -153,8 +153,28 @@ func (s *Server) handleNetworks(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		nets := s.store.ListNetworks()
+		type networkSummary struct {
+			ID          string    `json:"id"`
+			Name        string    `json:"name"`
+			Subnet      string    `json:"subnet"`
+			HasPassword bool      `json:"has_password"`
+			MemberCount int       `json:"member_count"`
+			CreatedAt   time.Time `json:"created_at"`
+		}
+		summaries := make([]networkSummary, len(nets))
+		for i, n := range nets {
+			mems := s.store.GetNetworkMemberships(n.Name)
+			summaries[i] = networkSummary{
+				ID:          n.ID,
+				Name:        n.Name,
+				Subnet:      n.Subnet,
+				HasPassword: n.PasswordHash != "",
+				MemberCount: len(mems),
+				CreatedAt:   n.CreatedAt,
+			}
+		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(nets)
+		_ = json.NewEncoder(w).Encode(summaries)
 
 	case http.MethodPost:
 		var req protocol.CreateNetworkRequest
@@ -172,11 +192,22 @@ func (s *Server) handleNetworks(w http.ResponseWriter, r *http.Request) {
 			req.Subnet = "10.100.0.0/16"
 		}
 
+		var pwHash string
+		if req.Password != "" {
+			var err error
+			pwHash, err = HashPassword(req.Password)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Failed to hash password: %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
+
 		netRec := &NetworkRecord{
-			ID:        "net-" + req.NetworkName,
-			Name:      req.NetworkName,
-			Subnet:    req.Subnet,
-			CreatedAt: time.Now(),
+			ID:           "net-" + req.NetworkName,
+			Name:         req.NetworkName,
+			Subnet:       req.Subnet,
+			PasswordHash: pwHash,
+			CreatedAt:    time.Now(),
 		}
 
 		if err := s.store.CreateNetwork(netRec); err != nil {
@@ -184,8 +215,10 @@ func (s *Server) handleNetworks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		respRec := *netRec
+		respRec.PasswordHash = ""
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(netRec)
+		_ = json.NewEncoder(w).Encode(respRec)
 
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -252,15 +285,34 @@ func (s *Server) handleJoinNetwork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inv, err := s.store.ConsumeInvite(req.InviteToken)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Invalid or expired invite token: %v", err), http.StatusForbidden)
-		return
-	}
-
-	netRec, found := s.store.GetNetwork(inv.NetworkName)
-	if !found {
-		http.Error(w, "Target network does not exist", http.StatusNotFound)
+	var netRec *NetworkRecord
+	if req.NetworkName != "" {
+		// Authenticate via network name and password
+		targetNet, found := s.store.GetNetwork(req.NetworkName)
+		if !found {
+			http.Error(w, fmt.Sprintf("Network '%s' does not exist", req.NetworkName), http.StatusNotFound)
+			return
+		}
+		if !targetNet.CheckPassword(req.Password) {
+			http.Error(w, "Invalid network password", http.StatusUnauthorized)
+			return
+		}
+		netRec = targetNet
+	} else if req.InviteToken != "" {
+		// Authenticate via invite token
+		inv, err := s.store.ConsumeInvite(req.InviteToken)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Invalid or expired invite token: %v", err), http.StatusForbidden)
+			return
+		}
+		targetNet, found := s.store.GetNetwork(inv.NetworkName)
+		if !found {
+			http.Error(w, "Target network does not exist", http.StatusNotFound)
+			return
+		}
+		netRec = targetNet
+	} else {
+		http.Error(w, "Either network_name with password, or invite_token must be provided", http.StatusBadRequest)
 		return
 	}
 

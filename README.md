@@ -13,7 +13,8 @@ MeshVPN is a fully self-hosted, high-performance mesh VPN system built with Go a
 - **Control Server (`meshvpn-server`)**: Centralized identity management, device authorization, IPAM allocation (`10.100.0.0/16`), peer candidate exchange, ACL rule distribution, and embedded STUN reflector. (HTTPS/REST on `:8080`, STUN on `:3478/udp`).
 - **Zero-Knowledge Relay (`meshvpn-relay`)**: Standalone, zero-knowledge UDP forwarder (`:41641/udp`). Forwards E2E WireGuard encrypted ciphertext frames. Possesses **zero decryption keys**.
 - **Client Daemon (`meshvpnd`)**: Headless service daemon for Linux and Windows. Handles STUN discovery, parallel UDP hole punching probing, WireGuard interface sync, and ACL enforcement.
-- **CLI (`meshvpn`)**: Command-line administrative tool for managing networks, invitations, peers, status, diagnostics, and ACLs.
+- **CLI (`meshvpn`)**: Command-line administrative tool for headless environments (Linux servers, Docker, scripts) to manage password-protected networks, peers, and status.
+- **Desktop GUI (`meshvpn-gui`)**: Seamless, standalone desktop app for Windows and desktop environments with system tray support, power toggle switch, one-click copy IP, Network menus, and live peer tree.
 
 ---
 
@@ -24,9 +25,8 @@ MeshVPN is a fully self-hosted, high-performance mesh VPN system built with Go a
 cp .env.example .env
 docker-compose up -d
 
-# Run CLI commands directly inside the control container:
-docker exec -it meshvpn-control meshvpn network create minecraft
-docker exec -it meshvpn-control meshvpn invite create minecraft
+# Create a password-protected network:
+docker exec -it meshvpn-control meshvpn network create minecraft --password mysecretpass
 ```
 
 ### Option B: Native Execution (Without Docker)
@@ -37,6 +37,7 @@ docker exec -it meshvpn-control meshvpn invite create minecraft
    go build -o bin/meshvpn-relay ./cmd/meshvpn-relay
    go build -o bin/meshvpnd ./cmd/meshvpnd
    go build -o bin/meshvpn ./cmd/meshvpn
+   go build -o bin/meshvpn-gui ./cmd/meshvpn-gui
    ```
 
 2. **Start Control Server & Embedded STUN Reflector**:
@@ -63,13 +64,13 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now meshvpn
 ```
 
-### 2. Join Network
+### 2. Join Network (Headless CLI)
 
 ```bash
-# Generate invite token on admin machine:
-meshvpn invite create minecraft
+# Join network using Network Name + Password:
+meshvpn join minecraft --password mysecretpass
 
-# Join network on Minecraft server:
+# Or join using a legacy invite token:
 meshvpn join <invite-token>
 ```
 
@@ -82,6 +83,25 @@ Output:
 Virtual IPv4: 10.100.0.10
 Active Network: minecraft
 ```
+
+---
+
+## Windows Desktop GUI Setup
+
+For a seamless Windows desktop experience with System Tray ("hidden icons") support:
+
+1. **Start the GUI Application**:
+   ```powershell
+   # Run the standalone desktop GUI:
+   .\bin\meshvpn-gui.exe
+   ```
+2. **Create or Join Networks**:
+   - Click **Network** -> **Create new network...**: Enter **Network Name** and **Password**.
+   - Click **Network** -> **Join an existing network...**: Enter credentials to connect.
+   - **One-Click Copy**: Click the **Copy** button next to your assigned Virtual IPv4 (e.g. `10.100.0.11`).
+   - **Live Peer Tree**: View all online friends/servers, latency, connection mode (Direct P2P vs Relayed), and ping peers.
+   - **Power Switch**: Turn VPN connection On/Off instantly with the power button.
+   - **System Tray**: Minimizes cleanly to the Windows taskbar hidden icons area with live status and quick action menu.
 
 ### 3. Bind Minecraft Server
 

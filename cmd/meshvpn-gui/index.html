@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MeshVPN Desktop</title>
+<style>
+  :root {
+    --bg-dark: #1e2026;
+    --bg-darker: #15171b;
+    --bg-card: #262932;
+    --bg-card-hover: #2f333e;
+    --border-color: #353a47;
+    --text-primary: #f0f3f6;
+    --text-muted: #8c95a5;
+    --mesh-green: #00e676;
+    --mesh-green-glow: rgba(0, 230, 118, 0.45);
+    --mesh-blue: #2979ff;
+    --mesh-blue-hover: #1e6bf2;
+    --mesh-red: #ff5252;
+    --font-stack: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+  }
+
+  body {
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+    font-family: var(--font-stack);
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Desktop Menu Bar */
+  .menu-bar {
+    background-color: var(--bg-darker);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    padding: 5px 8px;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .menu-item {
+    position: relative;
+    padding: 4px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    color: var(--text-primary);
+  }
+
+  .menu-item:hover {
+    background-color: var(--bg-card-hover);
+  }
+
+  .dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: var(--bg-darker);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    border-radius: 6px;
+    z-index: 1000;
+    min-width: 210px;
+    padding: 4px 0;
+  }
+
+  .dropdown-item {
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-primary);
+    font-size: 12px;
+  }
+
+  .dropdown-item:hover {
+    background-color: var(--mesh-blue);
+    color: #fff;
+  }
+
+  /* Control Header (Power & IP info) */
+  .control-header {
+    background: linear-gradient(180deg, #242731 0%, #1b1d24 100%);
+    border-bottom: 1px solid var(--border-color);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .power-btn {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 2px solid #454c5c;
+    background: radial-gradient(circle, #2e3340 0%, #1a1c22 100%);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s ease;
+    box-shadow: inset 0 2px 4px rgba(255,255,255,0.06), 0 4px 10px rgba(0,0,0,0.35);
+  }
+
+  .power-btn svg {
+    width: 30px;
+    height: 30px;
+    fill: #697184;
+    transition: all 0.25s ease;
+  }
+
+  .power-btn.active {
+    border-color: var(--mesh-green);
+    box-shadow: 0 0 16px var(--mesh-green-glow), inset 0 0 8px var(--mesh-green-glow);
+  }
+
+  .power-btn.active svg {
+    fill: var(--mesh-green);
+    filter: drop-shadow(0 0 5px var(--mesh-green));
+  }
+
+  .power-btn:hover {
+    transform: scale(1.04);
+  }
+
+  .host-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .host-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+  }
+
+  .host-ip-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .host-ip {
+    font-family: Consolas, monospace;
+    font-size: 21px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-icon {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.15s;
+  }
+
+  .btn-icon:hover {
+    background: var(--bg-card-hover);
+    border-color: #586072;
+  }
+
+  .host-status-line {
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted);
+  }
+
+  .status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background-color: #636b7b;
+  }
+
+  .status-dot.online {
+    background-color: var(--mesh-green);
+    box-shadow: 0 0 8px var(--mesh-green);
+  }
+
+  /* Network Content / Tree View */
+  .network-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 16px;
+    color: var(--text-muted);
+  }
+
+  .empty-state h3 {
+    margin-bottom: 8px;
+    color: var(--text-primary);
+  }
+
+  .empty-state p {
+    font-size: 12px;
+    line-height: 1.5;
+    margin-bottom: 18px;
+  }
+
+  .btn-primary {
+    background-color: var(--mesh-blue);
+    color: white;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--mesh-blue-hover);
+  }
+
+  /* Network Accordion Group */
+  .net-group {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .net-group-header {
+    padding: 10px 12px;
+    background-color: #2b2f3a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .net-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .net-badge {
+    background: #393f4e;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .peer-list {
+    padding: 4px 0;
+  }
+
+  .peer-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    transition: background 0.15s;
+  }
+
+  .peer-item:hover {
+    background-color: var(--bg-card-hover);
+  }
+
+  .peer-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .peer-name {
+    font-weight: 500;
+    color: #ffffff;
+  }
+
+  .peer-ip {
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .peer-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .mode-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    letter-spacing: 0.4px;
+  }
+
+  .mode-direct {
+    background-color: rgba(0, 230, 118, 0.15);
+    color: var(--mesh-green);
+    border: 1px solid rgba(0, 230, 118, 0.3);
+  }
+
+  .mode-relayed {
+    background-color: rgba(255, 171, 0, 0.15);
+    color: #ffb300;
+    border: 1px solid rgba(255, 171, 0, 0.3);
+  }
+
+  /* Footer Status Bar */
+  .footer-status {
+    background-color: var(--bg-darker);
+    border-top: 1px solid var(--border-color);
+    padding: 6px 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Modal Dialogs */
+  .modal-backdrop {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.68);
+    backdrop-filter: blur(3px);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-box {
+    background-color: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    width: 370px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.65);
+    overflow: hidden;
+  }
+
+  .modal-header {
+    background-color: var(--bg-darker);
+    padding: 12px 16px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .modal-close {
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 18px;
+  }
+
+  .modal-close:hover {
+    color: #ffffff;
+  }
+
+  .modal-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .form-group label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .form-control {
+    background-color: #15171b;
+    border: 1px solid var(--border-color);
+    color: #ffffff;
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    outline: none;
+  }
+
+  .form-control:focus {
+    border-color: var(--mesh-blue);
+  }
+
+  .modal-footer {
+    background-color: var(--bg-darker);
+    padding: 12px 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .btn-secondary {
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--bg-card-hover);
+  }
+
+  /* Toast Notification */
+  .toast {
+    position: fixed;
+    bottom: 34px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background-color: #2e323e;
+    color: white;
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.25s ease;
+    z-index: 3000;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+
+  <!-- Top Menu Bar -->
+  <div class="menu-bar">
+    <div class="menu-item" onclick="toggleMenu('net-menu')">
+      Network
+      <div id="net-menu" class="dropdown">
+        <div class="dropdown-item" onclick="openCreateModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Create new network...
+        </div>
+        <div class="dropdown-item" onclick="openJoinModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+          Join an existing network...
+        </div>
+        <div class="dropdown-item" onclick="leaveNetwork()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"/></svg>
+          Leave network
+        </div>
+      </div>
+    </div>
+    <div class="menu-item" onclick="toggleMenu('sys-menu')">
+      System
+      <div id="sys-menu" class="dropdown">
+        <div class="dropdown-item" onclick="openDiagnoseModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+          Run Diagnostics...
+        </div>
+        <div class="dropdown-item" onclick="refreshStatus()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          Refresh State
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Control Header (Power Switch & Host IP) -->
+  <div class="control-header">
+    <button id="power-button" class="power-btn" onclick="togglePower()" title="Toggle MeshVPN On/Off">
+      <svg viewBox="0 0 24 24">
+        <path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"/>
+      </svg>
+    </button>
+    <div class="host-info">
+      <div class="host-title" id="node-hostname">LOCAL MACHINE</div>
+      <div class="host-ip-row">
+        <span class="host-ip" id="virtual-ip">--.--.--.--</span>
+        <button class="btn-icon" onclick="copyIP()" title="Copy Virtual IPv4">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          Copy
+        </button>
+      </div>
+      <div class="host-status-line">
+        <div id="status-indicator" class="status-dot"></div>
+        <span id="status-text">Disconnected</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Body: Network Tree View -->
+  <div class="network-container" id="network-container">
+    <div class="empty-state" id="empty-state">
+      <h3>No Active Network</h3>
+      <p>Create a password-protected gaming network or join an existing network to connect with friends.</p>
+      <div style="display: flex; gap: 8px; justify-content: center;">
+        <button class="btn-primary" onclick="openJoinModal()">Join Network</button>
+        <button class="btn-secondary" onclick="openCreateModal()">Create Network</button>
+      </div>
+    </div>
+
+    <!-- Dynamic Network Group Template -->
+    <div id="active-net-group" class="net-group" style="display: none;">
+      <div class="net-group-header">
+        <div class="net-title-wrap">
+          <div class="status-dot online"></div>
+          <span id="active-net-name">minecraft</span>
+          <span class="net-badge" id="peer-count-badge">1/150</span>
+        </div>
+      </div>
+      <div class="peer-list" id="peer-list">
+        <!-- Injected via JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Footer Status Bar -->
+  <div class="footer-status">
+    <span id="footer-left">Control Server: 127.0.0.1:8080</span>
+    <span id="footer-right">WireGuard: --</span>
+  </div>
+
+  <!-- Create Network Modal -->
+  <div id="create-modal" class="modal-backdrop">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span>Create Network</span>
+        <span class="modal-close" onclick="closeModal('create-modal')">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Network Name:</label>
+          <input type="text" id="create-name" class="form-control" placeholder="e.g. MinecraftRealm" autofocus>
+        </div>
+        <div class="form-group">
+          <label>Password:</label>
+          <input type="password" id="create-pass" class="form-control" placeholder="Choose a password">
+        </div>
+        <div class="form-group">
+          <label>Confirm Password:</label>
+          <input type="password" id="create-confirm" class="form-control" placeholder="Confirm password">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('create-modal')">Cancel</button>
+        <button class="btn-primary" onclick="submitCreateNetwork()">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Join Network Modal -->
+  <div id="join-modal" class="modal-backdrop">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span>Join Network</span>
+        <span class="modal-close" onclick="closeModal('join-modal')">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Network Name or Invite Token:</label>
+          <input type="text" id="join-name" class="form-control" placeholder="Network Name or 32-char Token">
+        </div>
+        <div class="form-group">
+          <label>Password (if joining by name):</label>
+          <input type="password" id="join-pass" class="form-control" placeholder="Network password">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('join-modal')">Cancel</button>
+        <button class="btn-primary" onclick="submitJoinNetwork()">Join</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diagnostics Modal -->
+  <div id="diagnose-modal" class="modal-backdrop">
+    <div class="modal-box" style="width: 480px;">
+      <div class="modal-header">
+        <span>System Diagnostics</span>
+        <span class="modal-close" onclick="closeModal('diagnose-modal')">&times;</span>
+      </div>
+      <div class="modal-body">
+        <pre id="diagnose-output" style="background:#111; color:#0f0; padding:12px; font-size:11px; border-radius:4px; max-height:280px; overflow:auto;">Running diagnostic probes...</pre>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('diagnose-modal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast">Action performed successfully</div>
+
+<script>
+  let currentReport = null;
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  function copyIP(ipToCopy) {
+    const ip = ipToCopy || document.getElementById('virtual-ip').innerText;
+    if (ip && ip !== '--.--.--.--') {
+      navigator.clipboard.writeText(ip);
+      showToast('Copied: ' + ip);
+    }
+  }
+
+  function toggleMenu(id) {
+    const menu = document.getElementById(id);
+    const isOpen = menu.style.display === 'block';
+    document.querySelectorAll('.dropdown').forEach(d => d.style.display = 'none');
+    menu.style.display = isOpen ? 'none' : 'block';
+  }
+
+  window.onclick = function(e) {
+    if (!e.target.closest('.menu-item')) {
+      document.querySelectorAll('.dropdown').forEach(d => d.style.display = 'none');
+    }
+  };
+
+  function openCreateModal() {
+    document.querySelectorAll('.dropdown').forEach(d => d.style.display = 'none');
+    document.getElementById('create-modal').style.display = 'flex';
+    document.getElementById('create-name').focus();
+  }
+
+  function openJoinModal() {
+    document.querySelectorAll('.dropdown').forEach(d => d.style.display = 'none');
+    document.getElementById('join-modal').style.display = 'flex';
+    document.getElementById('join-name').focus();
+  }
+
+  function openDiagnoseModal() {
+    document.querySelectorAll('.dropdown').forEach(d => d.style.display = 'none');
+    const modal = document.getElementById('diagnose-modal');
+    modal.style.display = 'flex';
+    document.getElementById('diagnose-output').innerText = 'Running diagnostic probes...';
+    fetch('/api/diagnose')
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('diagnose-output').innerText = JSON.stringify(data, null, 2);
+      })
+      .catch(err => {
+        document.getElementById('diagnose-output').innerText = 'Error: ' + err.message;
+      });
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+  async function refreshStatus() {
+    try {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+      const pBtn = document.getElementById('power-button');
+      const dot = document.getElementById('status-indicator');
+      const stText = document.getElementById('status-text');
+      const ipElem = document.getElementById('virtual-ip');
+      const emptyState = document.getElementById('empty-state');
+      const netGroup = document.getElementById('active-net-group');
+      const peerList = document.getElementById('peer-list');
+      const footerRight = document.getElementById('footer-right');
+
+      if (!data.daemon_running) {
+        pBtn.classList.remove('active');
+        dot.className = 'status-dot';
+        stText.innerText = 'MeshVPN Daemon Offline';
+        ipElem.innerText = '--.--.--.--';
+        footerRight.innerText = 'Daemon: Not Running';
+        emptyState.style.display = 'block';
+        netGroup.style.display = 'none';
+        return;
+      }
+
+      currentReport = data.report;
+      if (!currentReport || !currentReport.active_network) {
+        pBtn.classList.remove('active');
+        dot.className = 'status-dot';
+        stText.innerText = 'Disconnected';
+        ipElem.innerText = '--.--.--.--';
+        emptyState.style.display = 'block';
+        netGroup.style.display = 'none';
+        footerRight.innerText = 'WireGuard: Inactive';
+        return;
+      }
+
+      // Online & Connected!
+      pBtn.classList.add('active');
+      dot.className = 'status-dot online';
+      stText.innerText = 'Connected (' + currentReport.active_network + ')';
+      ipElem.innerText = currentReport.virtual_ip || '10.100.0.10';
+      footerRight.innerText = 'WireGuard: ' + (currentReport.wireguard_interface || 'mesh0') + ' [UP]';
+
+      emptyState.style.display = 'none';
+      netGroup.style.display = 'block';
+      document.getElementById('active-net-name').innerText = currentReport.active_network;
+
+      const peers = currentReport.peers || [];
+      document.getElementById('peer-count-badge').innerText = (peers.length + 1) + '/150';
+
+      // Render Peer Items
+      let html = '';
+      
+      // Self item
+      html += '<div class="peer-item">' +
+        '<div class="peer-left">' +
+          '<div class="status-dot online"></div>' +
+          '<div>' +
+            '<div class="peer-name">You (This PC)</div>' +
+            '<div class="peer-ip">' + currentReport.virtual_ip + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="peer-right">' +
+          '<span class="mode-badge mode-direct">LOCAL</span>' +
+        '</div>' +
+      '</div>';
+
+      // Peer items
+      for (const p of peers) {
+        const isDirect = p.connection_state === 'DIRECT';
+        const modeClass = isDirect ? 'mode-direct' : 'mode-relayed';
+        const modeLabel = isDirect ? 'P2P DIRECT' : 'RELAYED';
+        const hostname = p.hostname || p.node_id.substring(0, 10);
+        html += '<div class="peer-item">' +
+          '<div class="peer-left">' +
+            '<div class="status-dot online"></div>' +
+            '<div>' +
+              '<div class="peer-name">' + hostname + '</div>' +
+              '<div class="peer-ip">' + p.virtual_ip + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="peer-right">' +
+            '<span class="mode-badge ' + modeClass + '">' + modeLabel + '</span>' +
+            '<button class="btn-icon" onclick="copyIP(\'' + p.virtual_ip + '\')" title="Copy Peer IP">Copy</button>' +
+            '<button class="btn-icon" onclick="pingPeer(\'' + p.virtual_ip + '\')" title="Probe Ping">Ping</button>' +
+          '</div>' +
+        '</div>';
+      }
+
+      peerList.innerHTML = html;
+    } catch (e) {
+      console.error("Status poll failed:", e);
+    }
+  }
+
+  async function togglePower() {
+    try {
+      const res = await fetch('/api/power', { method: 'POST' });
+      const data = await res.json();
+      showToast(data.message);
+      refreshStatus();
+    } catch (e) {
+      showToast('Failed to toggle power');
+    }
+  }
+
+  async function submitCreateNetwork() {
+    const name = document.getElementById('create-name').value.trim();
+    const pass = document.getElementById('create-pass').value;
+    const confirm = document.getElementById('create-confirm').value;
+
+    if (!name) {
+      showToast('Please enter a network name');
+      return;
+    }
+    if (pass !== confirm) {
+      showToast('Passwords do not match');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/network/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, password: pass })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.message || 'Failed to create network');
+        return;
+      }
+      closeModal('create-modal');
+      showToast('Network created & joined!');
+      refreshStatus();
+    } catch (e) {
+      showToast('Error: ' + e.message);
+    }
+  }
+
+  async function submitJoinNetwork() {
+    const input = document.getElementById('join-name').value.trim();
+    const pass = document.getElementById('join-pass').value;
+
+    if (!input) {
+      showToast('Please enter network name or token');
+      return;
+    }
+
+    const payload = {};
+    if (input.length === 32 && /^[0-9a-fA-F]+$/.test(input)) {
+      payload.invite_token = input;
+    } else {
+      payload.name = input;
+      payload.password = pass;
+    }
+
+    try {
+      const res = await fetch('/api/network/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.message || 'Failed to join network');
+        return;
+      }
+      closeModal('join-modal');
+      showToast('Joined network successfully!');
+      refreshStatus();
+    } catch (e) {
+      showToast('Error: ' + e.message);
+    }
+  }
+
+  async function leaveNetwork() {
+    document.querySelectorAll('.dropdown').forEach(d => d.style.display = 'none');
+    try {
+      const res = await fetch('/api/network/leave', { method: 'POST' });
+      const data = await res.json();
+      showToast('Left network');
+      refreshStatus();
+    } catch (e) {
+      showToast('Error leaving network');
+    }
+  }
+
+  async function pingPeer(ip) {
+    showToast('Pinging ' + ip + '...');
+    try {
+      const res = await fetch('/api/peer/ping?ip=' + ip);
+      const data = await res.json();
+      showToast('Reply from ' + ip + ': ' + data.latency_ms + ' ms');
+    } catch (e) {
+      showToast('Ping failed');
+    }
+  }
+
+  // Periodic Polling every 2.5 seconds
+  refreshStatus();
+  setInterval(refreshStatus, 2500);
+</script>
+</body>
+</html>

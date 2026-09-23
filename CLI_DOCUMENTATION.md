@@ -145,31 +145,39 @@ meshvpn diagnose
 
 ---
 
-### `meshvpn network create <name> [subnet]`
+### `meshvpn network create <name> [--password <password>] [--subnet <cidr>]`
 
-Create a new isolated virtual network subnet.
+Create a new isolated virtual network subnet, optionally protected with a password.
 
 #### Parameters
 - `<name>` *(Required)*: Unique network identifier (e.g. `minecraft`, `homelab`, `dev`).
-- `[subnet]` *(Optional)*: Subnet CIDR block. Default is `10.100.0.0/16`.
+- `--password`, `-p` *(Optional)*: Password required for other nodes/players to join.
+- `--subnet`, `-s` *(Optional)*: Subnet CIDR block. Default is `10.100.0.0/16`.
 
-#### Example
+#### Examples
 ```bash
-meshvpn network create minecraft 10.100.0.0/16
+# Password-protected network:
+meshvpn network create minecraft --password mysecret123
+
+# Open or token-only network:
+meshvpn network create homelab 10.200.0.0/16
 ```
 ```text
-Network 'minecraft' (10.100.0.0/16) created successfully.
+Network 'minecraft' created successfully.
+Password protected: Yes (others can join with: meshvpn join minecraft <password>)
 ```
 
 ---
 
-### `meshvpn network list`
+### `meshvpn network list` (Alias: `meshvpn listnetworks`, `meshvpn networks`)
 
 List all created virtual networks registered on the control plane.
 
 #### Example
 ```bash
 meshvpn network list
+# Or ZeroTier-style shorthand:
+meshvpn listnetworks
 ```
 
 ---
@@ -199,15 +207,23 @@ Share with player/node: meshvpn join 2bc22a90c780370c086eab5c09d83b71
 
 ---
 
-### `meshvpn join <invite-token>`
+### `meshvpn join <name|invite-token> [password] [--password <password>]`
 
-Join a virtual network using a valid invitation token. Assigns a unique virtual IPv4 address (`10.100.x.x`).
+Join a virtual network using credentials (Network Name + Password) or a valid invitation token. Assigns a unique virtual IPv4 address (`10.100.x.x`).
 
 #### Parameters
-- `<invite-token>` *(Required)*: 32-character hex invite token.
+- `<name|invite-token>` *(Required)*: Network name or 32-character hex invite token.
+- `[password]` / `--password`, `-p` *(Optional)*: Password for the target network. Can be supplied as a direct positional argument or via flag. If omitted, you will be prompted.
 
-#### Example
+#### Examples
 ```bash
+# Join directly with password (ZeroTier-style simplicity):
+meshvpn join minecraft mysecret123
+
+# Or with flag:
+meshvpn join minecraft --password mysecret123
+
+# Join via single-use invite token:
 meshvpn join 2bc22a90c780370c086eab5c09d83b71
 ```
 ```text

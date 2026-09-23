@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/meshvpn/meshvpn/pkg/protocol"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // StorePersist defines serializable database layout.
@@ -33,10 +34,11 @@ type NodeRecord struct {
 }
 
 type NetworkRecord struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Subnet    string    `json:"subnet"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Subnet       string    `json:"subnet"`
+	PasswordHash string    `json:"password_hash,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type MembershipRecord struct {
@@ -252,4 +254,23 @@ func GenerateInviteToken() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// HashPassword hashes a plain text password using bcrypt.
+func HashPassword(password string) (string, error) {
+	if password == "" {
+		return "", nil
+	}
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytes), err
+}
+
+// CheckPassword verifies a plaintext password against the stored password hash.
+func (nr *NetworkRecord) CheckPassword(password string) bool {
+	if nr.PasswordHash == "" {
+		// If the network has no password, empty password matches
+		return password == ""
+	}
+	err := bcrypt.CompareHashAndPassword([]byte(nr.PasswordHash), []byte(password))
+	return err == nil
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -76,19 +78,24 @@ func main() {
 		RelayAddr:  *relayAddr,
 	}
 
-	// 3. Register Node Identity with Control Server
-	if err := registerNodeWithControl(state); err != nil {
-		log.Printf("[meshvpnd] Notice: Initial control plane registration failed (will retry): %v", err)
-	}
-
-	// 4. Start Local IPC Listener for CLI
+	// 3. Start Local IPC Listener for CLI Immediately
 	ipcListener, err := ipc.ListenIPC()
 	if err != nil {
 		log.Printf("[meshvpnd] Warning: Failed to start IPC socket: %v", err)
 	} else {
 		defer ipcListener.Close()
 		go serveIPC(ipcListener, state)
+		log.Printf("[meshvpnd] IPC listening on %s", ipc.GetSocketPath())
 	}
+
+	// 4. Register Node Identity with Control Server (with timeout)
+	go func() {
+		if err := registerNodeWithControl(state); err != nil {
+			log.Printf("[meshvpnd] Notice: Initial control plane registration: %v (will auto-retry)", err)
+		} else {
+			log.Printf("[meshvpnd] Successfully registered node with control plane")
+		}
+	}()
 
 	// 5. Start Background Network Sync Worker Loop
 	ctx, cancel := context.WithCancel(context.Background())
@@ -120,7 +127,8 @@ func registerNodeWithControl(state *DaemonState) error {
 	}
 
 	body, _ := json.Marshal(req)
-	resp, err := http.Post(state.ControlURL+"/api/v1/auth/register", "application/json", bytes.NewBuffer(body))
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Post(state.ControlURL+"/api/v1/auth/register", "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
@@ -257,6 +265,8 @@ func handleIPCConn(conn net.Conn, state *DaemonState) {
 
 	case "join":
 		joinReq := protocol.JoinNetworkRequest{
+			NetworkName:        req.NetworkName,
+			Password:           req.Password,
 			InviteToken:        req.InviteToken,
 			NodeID:             state.Identity.NodeID,
 			WireGuardPublicKey: state.Identity.WireGuardPublicKey,
@@ -271,7 +281,12 @@ func handleIPCConn(conn net.Conn, state *DaemonState) {
 			defer httpResp.Body.Close()
 			if httpResp.StatusCode != http.StatusOK {
 				resp.Success = false
-				resp.Message = fmt.Sprintf("Control plane rejected join request (Status: %s)", httpResp.Status)
+				respBytes, _ := io.ReadAll(httpResp.Body)
+				errMsg := strings.TrimSpace(string(respBytes))
+				if errMsg == "" {
+					errMsg = httpResp.Status
+				}
+				resp.Message = fmt.Sprintf("Control plane rejected join request: %s", errMsg)
 			} else {
 				var joinResp protocol.JoinNetworkResponse
 				if err := json.NewDecoder(httpResp.Body).Decode(&joinResp); err == nil {
@@ -290,11 +305,50 @@ func handleIPCConn(conn net.Conn, state *DaemonState) {
 			}
 		}
 
+	case "network_create":
+		subnet := req.Subnet
+		if subnet == "" {
+			subnet = "10.100.0.0/16"
+		}
+		createReq := protocol.CreateNetworkRequest{
+			NetworkName: req.NetworkName,
+			Subnet:      subnet,
+			Password:    req.Password,
+		}
+		body, _ := json.Marshal(createReq)
+		httpResp, err := http.Post(state.ControlURL+"/api/v1/networks", "application/json", bytes.NewBuffer(body))
+		if err != nil {
+			resp.Success = false
+			resp.Message = fmt.Sprintf("Failed to contact control plane: %v", err)
+		} else {
+			defer httpResp.Body.Close()
+			if httpResp.StatusCode != http.StatusOK {
+				resp.Success = false
+				respBytes, _ := io.ReadAll(httpResp.Body)
+				errMsg := strings.TrimSpace(string(respBytes))
+				if errMsg == "" {
+					errMsg = httpResp.Status
+				}
+				resp.Message = fmt.Sprintf("Failed to create network: %s", errMsg)
+			} else {
+				resp.Message = fmt.Sprintf("Network '%s' created successfully.", req.NetworkName)
+			}
+		}
+
 	case "leave":
 		state.ActiveNetwork = ""
 		state.VirtualIP = ""
 		state.Peers = nil
 		resp.Message = "Left network successfully"
+
+	case "shutdown":
+		resp.Message = "MeshVPN daemon shutting down..."
+		_ = json.NewEncoder(conn).Encode(resp)
+		go func() {
+			time.Sleep(200 * time.Millisecond)
+			os.Exit(0)
+		}()
+		return
 
 	default:
 		resp.Success = false
