@@ -97,6 +97,8 @@ Players can now connect directly to `10.100.0.10:25565` over the encrypted mesh 
 
 ## CLI Reference Cheatsheet
 
+For full command details, syntax flags, Docker execution examples, and JSON schemas, see the complete [CLI Documentation](CLI_DOCUMENTATION.md).
+
 ```bash
 # Connection & Status
 meshvpn status              # Show status summary
